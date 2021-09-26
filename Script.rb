@@ -34,13 +34,8 @@
 # and Pokémon Trainer Memo, just change 'pbGetTimeNow' to 'Time.now' in their
 # scripts.
 #
-# This script use the Ruby Time class that can only hold years around 
-# 1970-2038 range. If you wish to have other years values, sum/subtract when
-# displaying the year. Examples: 
-# If you wants year 1000, start in 1970 and, when displaying year name use 
-# 'pbGetTimeNow.year-970'. 
-# If you wants year 5000, start in 1970 and, when displaying year name use 
-# 'pbGetTimeNow.year+3030'.
+# This script uses the Ruby Time class. Before Essentials version 19 (who came
+# with 64-bit ruby) it can only have 1901-2038 range.
 # 
 # Some time methods:
 # 'pbGetTimeNow.year', 'pbGetTimeNow.mon' (the numbers from 1-12), 
@@ -50,6 +45,15 @@
 # 'pbGetTimeNow.strftime("%I:%M %p")' (displays Hours:Minutes pm/am)
 # 
 #===============================================================================
+
+if defined?(PluginManager) && !PluginManager.installed?("Unreal Time System")
+  PluginManager.register({                                                 
+    :name    => "Unreal Time System",                                        
+    :version => "1.1",                                                     
+    :link    => "https://www.pokecommunity.com/showthread.php?t=285831",             
+    :credits => "FL"
+  })
+end
 
 module UnrealTime
   # Set false to disable this system (returns Time.now)
@@ -91,7 +95,6 @@ module UnrealTime
   EXTRA_DAYS=-1
 
   # Initial date. In sequence: Year, month, day, hour and minutes.
-  # Year can only holds around range 1970-2038
   # Method UnrealTime.reset resets time back to this time.
   def self.initial_date
     return Time.local(2000,1,1, 12,0)
@@ -133,6 +136,8 @@ module UnrealTime
   def self.add_days(days)
     add_seconds(60*60*24*days)
   end
+
+  NEED_32_BIT_FIX = [''].pack('p').size <= 4
 end
 
 # Essentials V18 and lower compatibility
@@ -166,7 +171,7 @@ module PBDayNight
 end
 
 def pbGetTimeNow
-  return Time.now if !UnrealTime::ENABLED
+  return Time.now if !$PokemonGlobal || !UnrealTime::ENABLED
   day_seconds = 60*60*24
   if UnrealTime::TIME_STOPS
     # Sum the extra values to newFrameCount
@@ -190,7 +195,7 @@ def pbGetTimeNow
     end  
   end  
   start_time=UnrealTime.initial_date
-  if UnrealTime::TIME_STOPS && $PokemonGlobal
+  if UnrealTime::TIME_STOPS
     time_played=$PokemonGlobal.newFrameCount
   else
     time_played=Graphics.frame_count
@@ -201,18 +206,21 @@ def pbGetTimeNow
     time_jumped+=pbGet(UnrealTime::EXTRA_SECONDS)
   end
   if UnrealTime::EXTRA_DAYS>-1 
-  time_jumped+=pbGet(UnrealTime::EXTRA_DAYS)*day_seconds
+    time_jumped+=pbGet(UnrealTime::EXTRA_DAYS)*day_seconds
   end
-  time_ret = nil
-  # To prevent crashes due to year limit, every time that you reach in year 
-  # 2036 the system will subtract 6 years (to works with leap year) from
-  # your date and sum in $PokemonGlobal.extraYears. You can sum your actual
-  # year with this extraYears when displaying years.
+  time_ret = 0
+  # Before Essentials V19, there is a year limit. To prevent crashes due to this
+  # limit, every time that you reach in year 2036 the system will subtract 6
+  # years (to works with leap year) from your date and sum in 
+  # $PokemonGlobal.extraYears. You can sum your actual year with this extraYears
+  # when displaying years.
   loop do
-    extraYears=($PokemonGlobal) ? $PokemonGlobal.extraYears : 0
-    time_fix=extraYears*day_seconds*(365*6+1)/6
+    time_fix=0
+    if $PokemonGlobal.extraYears!=0
+      time_fix = $PokemonGlobal.extraYears*day_seconds*(365*6+1)/6
+    end
     time_ret=start_time+(time_played+time_jumped-time_fix)
-    break if time_ret.year<2036
+    break if !UnrealTime::NEED_32_BIT_FIX || time_ret.year<2036
     $PokemonGlobal.extraYears+=6
   end
   return time_ret
