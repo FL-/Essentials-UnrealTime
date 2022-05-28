@@ -266,7 +266,7 @@ if UnrealTime::ENABLED
     end  
   
     if UnrealTime::BATTLE_PASS
-      class PokeBattle_Scene
+      class Battle::Scene
         alias :pbGraphicsUpdateold :pbGraphicsUpdate
         def pbGraphicsUpdate
           $PokemonGlobal.addNewFrameCount 
