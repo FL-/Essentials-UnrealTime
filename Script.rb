@@ -49,7 +49,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Unreal Time System")
   PluginManager.register({                                                 
     :name    => "Unreal Time System",                                        
-    :version => "1.1",                                                     
+    :version => "1.1.1",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=285831",             
     :credits => "FL"
   })
@@ -266,7 +266,8 @@ if UnrealTime::ENABLED
     end  
   
     if UnrealTime::BATTLE_PASS
-      class Battle::Scene
+	  PokeBattle_Scene = Battle::Scene if !defined?(PokeBattle_Scene)
+      class PokeBattle_Scene
         alias :pbGraphicsUpdateold :pbGraphicsUpdate
         def pbGraphicsUpdate
           $PokemonGlobal.addNewFrameCount 
