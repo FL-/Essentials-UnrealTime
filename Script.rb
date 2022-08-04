@@ -112,7 +112,7 @@ module UnrealTime
     target_seconds = hour*60*60+min*60+sec
     seconds_added = target_seconds-seconds_now
     seconds_added += day_seconds if seconds_added<0
-    $PokemonGlobal.newFrameCount+=seconds_added
+    add_seconds(seconds_added)
     PBDayNight.sheduleToneRefresh
   end
 
@@ -266,7 +266,7 @@ if UnrealTime::ENABLED
     end  
   
     if UnrealTime::BATTLE_PASS
-	  PokeBattle_Scene = Battle::Scene if !defined?(PokeBattle_Scene)
+      PokeBattle_Scene = Battle::Scene if !defined?(PokeBattle_Scene)
       class PokeBattle_Scene
         alias :pbGraphicsUpdateold :pbGraphicsUpdate
         def pbGraphicsUpdate
