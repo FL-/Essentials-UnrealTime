@@ -4,7 +4,8 @@
 #
 # This script is for Pokémon Essentials. It makes the time in game uses its
 # own clock that only pass when you are in game instead of using real time
-# (like Minecraft and Zelda: Ocarina of Time).
+# (like Legends: Arceus, Scarlet/Violet and Minecraft). Also include ways to 
+# skip/set time.
 #
 #== INSTALLATION ===============================================================
 #
@@ -12,7 +13,7 @@
 #
 #== HOW TO USE =================================================================
 #
-# This script automatic works after installed. 
+# This script automatically works after installed. 
 #
 # If you wish to add/reduce time, there are 3 ways:
 #
@@ -30,9 +31,13 @@
 #
 #== NOTES ======================================================================
 #
-# If you wish to some parts still use real time like the Trainer Card start time
-# and Pokémon Trainer Memo, just change 'pbGetTimeNow' to 'Time.now' in their
-# scripts.
+# If you wish to some parts use this time instead of real time, like the
+# Trainer Card start time and Pokémon Trainer Memo, just change 'Time.now' to 
+# 'pbGetTimeNow' in their scripts. You can to the reverse too for using real 
+# time instead of Unreal Time in certain places. However, there is a notable 
+# exception: To change the startTime (from back of your Trainer Card) to use
+# Unreal Time, at the end of professor lecture call script command line 
+# '$PokemonGlobal.startTime = pbGetTimeNow'.
 #
 # This script uses the Ruby Time class. Before Essentials version 19 (who came
 # with 64-bit ruby) it can only have 1901-2038 range.
@@ -49,7 +54,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Unreal Time System")
   PluginManager.register({                                                 
     :name    => "Unreal Time System",                                        
-    :version => "1.1.1",                                                     
+    :version => "1.2",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=285831",             
     :credits => "FL"
   })
@@ -57,53 +62,56 @@ end
 
 module UnrealTime
   # Set false to disable this system (returns Time.now)
-  ENABLED=true
+  ENABLED = true
 
   # Time proportion here. 
   # So if it is 100, one second in real time will be 100 seconds in game.
   # If it is 60, one second in real time will be one minute in game.
-  PROPORTION=60
+  # Scarlet/Violet uses 50 (72 real life minutes per game day).
+  PROPORTION = 50
 
   # Starting on Essentials v17, the map tone only try to refresh tone each 30 
   # real time seconds. 
   # If this variable number isn't -1, the game use this number instead of 30.
   # When time is changed with advance_to or add_seconds, the tone refreshes.
-  TONE_CHECK_INTERVAL = 10.0
+  TONE_CHECK_INTERVAL = 5.0
 
   # Make this true to time only pass at field (Scene_Map) 
   # A note to scripters: To make time pass on other scenes, put line
   # '$PokemonGlobal.addNewFrameCount' near to line 'Graphics.update'
-  TIME_STOPS=true 
+  TIME_STOPS = false 
 
   # Make this true to time pass in battle, during turns and command selection.
   # This won't affect the Pokémon and Bag submenus.
   # Only works if TIME_STOPS=true.
-  BATTLE_PASS=true
+  BATTLE_PASS = true
 
   # Make this true to time pass when the Dialog box or the main menu are open.
   # This won't affect the submenus like Pokémon and Bag.
   # Only works if TIME_STOPS=true.
-  TALK_PASS=true
+  TALK_PASS = true
 
   # Choose switch number that when true the time won't pass (or -1 to cancel). 
   # Only works if TIME_STOPS=true.
-  SWITCH_STOPS=-1
+  SWITCH_STOPS = -1
 
   # Choose variable(s) number(s) that can hold time passage (or -1 to cancel).
   # Look at description for more details.
   EXTRA_SECONDS=-1
   EXTRA_DAYS=-1
 
+  module_function
+
   # Initial date. In sequence: Year, month, day, hour and minutes.
   # Method UnrealTime.reset resets time back to this time.
-  def self.initial_date
+  def initial_date
     return Time.local(2000,1,1, 12,0)
   end
 
   # Advance to next time. If time already passed, advance 
   # into the time on the next day.
   # Hour is 0..23
-  def self.advance_to(hour,min=0,sec=0) 
+  def advance_to(hour,min=0,sec=0) 
     if hour < 0 || hour > 23
       raise RangeError, "hour is #{hour}, should be 0..23"
     end
@@ -117,40 +125,118 @@ module UnrealTime
   end
 
   # Resets time to initial_date.
-  def self.reset
+  def reset
     raise "Method doesn't work when TIME_STOPS is false!" if !TIME_STOPS
     $game_variables[EXTRA_SECONDS]=0 if EXTRA_DAYS>0
     $game_variables[EXTRA_DAYS]=0 if EXTRA_DAYS>0
-    $PokemonGlobal.newFrameCount=0
+    $PokemonGlobal.newSecondsCount=0
     $PokemonGlobal.extraYears=0
     PBDayNight.sheduleToneRefresh
   end
 
   # Does the same thing as EXTRA_SECONDS variable.
-  def self.add_seconds(seconds)
+  def add_seconds(seconds)
     raise "Method doesn't work when TIME_STOPS is false!" if !TIME_STOPS
-    $PokemonGlobal.newFrameCount+=(seconds*Graphics.frame_rate)/PROPORTION.to_f
+    $PokemonGlobal.newSecondsCount+=seconds/PROPORTION.to_f
     PBDayNight.sheduleToneRefresh
   end
 
-  def self.add_days(days)
+  def add_days(days)
     add_seconds(60*60*24*days)
   end
 
+  def time_now
+    day_seconds = 60*60*24
+    if TIME_STOPS
+      # Sum the extra values to newSecondCount
+      if EXTRA_SECONDS > 0
+        add_seconds(pbGet(EXTRA_SECONDS))
+        $game_variables[EXTRA_SECONDS] = 0
+      end  
+      if EXTRA_DAYS > 0
+        add_seconds(day_seconds*pbGet(EXTRA_DAYS))
+        $game_variables[EXTRA_DAYS] = 0
+      end
+    elsif EXTRA_SECONDS > 0 && EXTRA_DAYS > 0
+      # Checks to regulate the max/min values at EXTRA_SECONDS
+      while pbGet(EXTRA_SECONDS) >= day_seconds
+        $game_variables[EXTRA_SECONDS] -= day_seconds
+        $game_variables[EXTRA_DAYS] += 1
+      end
+      while pbGet(EXTRA_SECONDS) <= -day_seconds
+        $game_variables[EXTRA_SECONDS] += day_seconds
+        $game_variables[EXTRA_DAYS] -= 1
+      end  
+    end  
+    start_time = initial_date
+    time_played = TIME_STOPS ? $PokemonGlobal.newSecondCount : Bridge.play_time
+    time_played = time_played*PROPORTION
+    time_jumped = 0
+    time_jumped += pbGet(EXTRA_SECONDS) if EXTRA_SECONDS > -1 
+    time_jumped += pbGet(EXTRA_DAYS)*day_seconds if EXTRA_DAYS > -1 
+    time_ret = 0
+    # Before Essentials V19, there is a year limit. To prevent crashes due to
+    # this limit, every time that you reach in year 2036 the system will
+    # subtract 4 years (to works with leap year) from your date and sum in 
+    # $PokemonGlobal.extraYears. You can sum your actual year with this 
+    # extraYears when displaying years.
+    loop do
+      time_fix = 0
+      time_fix = $PokemonGlobal.extraYears*day_seconds*(365*4+1)/4 if $PokemonGlobal.extraYears!=0
+      time_ret = start_time + (time_played+time_jumped-time_fix)
+      break if !NEED_32_BIT_FIX || time_ret.year<2036
+      $PokemonGlobal.extraYears+=4
+    end
+    return time_ret
+  end
+  
   NEED_32_BIT_FIX = [''].pack('p').size <= 4
+
+  # Essentials multiversion layer
+  module Bridge
+    module_function
+
+    def major_version
+      ret = 0
+      if defined?(Essentials)
+        ret = Essentials::VERSION.split(".")[0].to_i
+      elsif defined?(ESSENTIALS_VERSION)
+        ret = ESSENTIALS_VERSION.split(".")[0].to_i
+      elsif defined?(ESSENTIALSVERSION)
+        ret = ESSENTIALSVERSION.split(".")[0].to_i
+      end
+      return ret
+    end
+
+    MAJOR_VERSION = major_version
+
+    def delta
+      return 0.025 if MAJOR_VERSION < 21
+      return Graphics.delta
+    end
+
+    def play_time
+      return Graphics.frame_count/Graphics.frame_rate.to_f if MAJOR_VERSION < 21
+      return $stats.play_time
+    end
+
+    def time_shading
+      return case MAJOR_VERSION
+        when 0..17; ENABLESHADING
+        when 18;    TIME_SHADING
+        else        Settings::TIME_SHADING
+      end
+    end
+  end
 end
 
 # Essentials V18 and lower compatibility
-module Settings
-  TIME_SHADING = defined?(ENABLESHADING) ? ENABLESHADING : ::TIME_SHADING 
-end if defined?(TIME_SHADING) || defined?(ENABLESHADING)
-
 module PBDayNight
   class << self
     if method_defined?(:getTone) && UnrealTime::TONE_CHECK_INTERVAL > 0
       def getTone
         @cachedTone = Tone.new(0,0,0) if !@cachedTone
-        return @cachedTone if !Settings::TIME_SHADING
+        return @cachedTone if !UnrealTime::Bridge.time_shading
         toneNeedUpdate = (!@dayNightToneLastUpdate || 
           Graphics.frame_count-@dayNightToneLastUpdate >=
           Graphics.frame_rate*UnrealTime::TONE_CHECK_INTERVAL
@@ -171,79 +257,26 @@ module PBDayNight
 end
 
 def pbGetTimeNow
-  return Time.now if !$PokemonGlobal || !UnrealTime::ENABLED
-  day_seconds = 60*60*24
-  if UnrealTime::TIME_STOPS
-    # Sum the extra values to newFrameCount
-    if UnrealTime::EXTRA_SECONDS>0
-      UnrealTime.add_seconds(pbGet(UnrealTime::EXTRA_SECONDS))
-      $game_variables[UnrealTime::EXTRA_SECONDS]=0
-    end  
-    if UnrealTime::EXTRA_DAYS>0
-      UnrealTime.add_seconds(day_seconds*pbGet(UnrealTime::EXTRA_DAYS))
-      $game_variables[UnrealTime::EXTRA_DAYS]=0
-    end
-  elsif UnrealTime::EXTRA_SECONDS>0 && UnrealTime::EXTRA_DAYS>0
-    # Checks to regulate the max/min values at UnrealTime::EXTRA_SECONDS
-    while pbGet(UnrealTime::EXTRA_SECONDS)>=day_seconds
-      $game_variables[UnrealTime::EXTRA_SECONDS]-=day_seconds
-      $game_variables[UnrealTime::EXTRA_DAYS]+=1
-    end
-    while pbGet(UnrealTime::EXTRA_SECONDS)<=-day_seconds
-      $game_variables[UnrealTime::EXTRA_SECONDS]+=day_seconds
-      $game_variables[UnrealTime::EXTRA_DAYS]-=1
-    end  
-  end  
-  start_time=UnrealTime.initial_date
-  if UnrealTime::TIME_STOPS
-    time_played=$PokemonGlobal.newFrameCount
-  else
-    time_played=Graphics.frame_count
-  end
-  time_played=(time_played*UnrealTime::PROPORTION)/Graphics.frame_rate
-  time_jumped=0
-  if UnrealTime::EXTRA_SECONDS>-1 
-    time_jumped+=pbGet(UnrealTime::EXTRA_SECONDS)
-  end
-  if UnrealTime::EXTRA_DAYS>-1 
-    time_jumped+=pbGet(UnrealTime::EXTRA_DAYS)*day_seconds
-  end
-  time_ret = 0
-  # Before Essentials V19, there is a year limit. To prevent crashes due to this
-  # limit, every time that you reach in year 2036 the system will subtract 6
-  # years (to works with leap year) from your date and sum in 
-  # $PokemonGlobal.extraYears. You can sum your actual year with this extraYears
-  # when displaying years.
-  loop do
-    time_fix=0
-    if $PokemonGlobal.extraYears!=0
-      time_fix = $PokemonGlobal.extraYears*day_seconds*(365*6+1)/6
-    end
-    time_ret=start_time+(time_played+time_jumped-time_fix)
-    break if !UnrealTime::NEED_32_BIT_FIX || time_ret.year<2036
-    $PokemonGlobal.extraYears+=6
-  end
-  return time_ret
+  return $PokemonGlobal && UnrealTime::ENABLED ? UnrealTime.time_now : Time.now
 end
 
 if UnrealTime::ENABLED
   class PokemonGlobalMetadata
-    attr_accessor :newFrameCount # Became float when using extra values
-    attr_accessor :extraYears 
+    attr_writer :newSecondCount
+    attr_writer :extraYears 
     
     def addNewFrameCount
-      return if (UnrealTime::SWITCH_STOPS>0 && 
-        $game_switches[UnrealTime::SWITCH_STOPS])
-      self.newFrameCount+=1
+      return if UnrealTime::SWITCH_STOPS>0 && $game_switches[UnrealTime::SWITCH_STOPS]
+      self.newSecondCount+=UnrealTime::Bridge.delta
     end
     
-    def newFrameCount
-      @newFrameCount=0 if !@newFrameCount
-      return @newFrameCount
+    def newSecondCount
+      @newSecondCount = 0.0 if !@newSecondCount
+      return @newSecondCount
     end
     
     def extraYears
-      @extraYears=0 if !@extraYears
+      @extraYears = 0 if !@extraYears
       return @extraYears
     end
   end  
@@ -265,8 +298,8 @@ if UnrealTime::ENABLED
       end
     end  
   
-    if UnrealTime::BATTLE_PASS
-      PokeBattle_Scene = Battle::Scene if !defined?(PokeBattle_Scene)
+  if UnrealTime::BATTLE_PASS
+	  PokeBattle_Scene = Battle::Scene if !defined?(PokeBattle_Scene)
       class PokeBattle_Scene
         alias :pbGraphicsUpdateold :pbGraphicsUpdate
         def pbGraphicsUpdate
