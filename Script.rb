@@ -54,7 +54,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Unreal Time System")
   PluginManager.register({                                                 
     :name    => "Unreal Time System",                                        
-    :version => "1.2",                                                     
+    :version => "1.2.1",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=285831",             
     :credits => "FL"
   })
@@ -79,7 +79,7 @@ module UnrealTime
   # Make this true to time only pass at field (Scene_Map) 
   # A note to scripters: To make time pass on other scenes, put line
   # '$PokemonGlobal.addNewFrameCount' near to line 'Graphics.update'
-  TIME_STOPS = false 
+  TIME_STOPS = true 
 
   # Make this true to time pass in battle, during turns and command selection.
   # This won't affect the Pokémon and Bag submenus.
@@ -129,7 +129,7 @@ module UnrealTime
     raise "Method doesn't work when TIME_STOPS is false!" if !TIME_STOPS
     $game_variables[EXTRA_SECONDS]=0 if EXTRA_DAYS>0
     $game_variables[EXTRA_DAYS]=0 if EXTRA_DAYS>0
-    $PokemonGlobal.newSecondsCount=0
+    $PokemonGlobal.newSecondCount=0
     $PokemonGlobal.extraYears=0
     PBDayNight.sheduleToneRefresh
   end
@@ -137,7 +137,7 @@ module UnrealTime
   # Does the same thing as EXTRA_SECONDS variable.
   def add_seconds(seconds)
     raise "Method doesn't work when TIME_STOPS is false!" if !TIME_STOPS
-    $PokemonGlobal.newSecondsCount+=seconds/PROPORTION.to_f
+    $PokemonGlobal.newSecondCount+=seconds/PROPORTION.to_f
     PBDayNight.sheduleToneRefresh
   end
 
