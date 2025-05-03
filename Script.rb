@@ -23,8 +23,9 @@
 # 8 hours, so put in EXTRA_SECONDS a game variable number and sum 
 # 28800 (60*60*8) in this variable every time that the players sleeps.
 #
-# 2. 'UnrealTime.add_seconds(seconds)' and 'UnrealTime.add_days(days)' does the
-# same thing, in fact, EXTRA_SECONDS/EXTRA_DAYS call these methods.
+# 2. 'UnrealTime.add_seconds(seconds)', 'UnrealTime.add_minutes(minutes)',
+# 'UnrealTime.add_hours(hours)' and 'UnrealTime.add_days(days)' do similar
+# things, in fact, EXTRA_SECONDS/EXTRA_DAYS call these methods.
 #
 # 3. 'UnrealTime.advance_to(16,17,18)' advance the time to a fixed time of day, 
 # 16:17:18 on this example.
@@ -53,8 +54,8 @@
 
 if defined?(PluginManager) && !PluginManager.installed?("Unreal Time System")
   PluginManager.register({                                                 
-    :name    => "Unreal Time System",                                        
-    :version => "1.2.1",                                                     
+    :name    => "Unreal Time System",                                 
+    :version => "1.2.2",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=285831",             
     :credits => "FL"
   })
@@ -73,7 +74,8 @@ module UnrealTime
   # Starting on Essentials v17, the map tone only try to refresh tone each 30 
   # real time seconds. 
   # If this variable number isn't -1, the game use this number instead of 30.
-  # When time is changed with advance_to or add_seconds, the tone refreshes.
+  # When time is changed with advance_to or add_seconds (and others), the tone
+  # refreshes.
   TONE_CHECK_INTERVAL = 5.0
 
   # Make this true to time only pass at field (Scene_Map) 
@@ -141,8 +143,16 @@ module UnrealTime
     PBDayNight.sheduleToneRefresh
   end
 
+  def add_minutes(minutes)
+    add_seconds(60*minutes)
+  end
+
+  def add_hours(hours)
+    add_minutes(60*hours)
+  end
+
   def add_days(days)
-    add_seconds(60*60*24*days)
+    add_hours(24*days)
   end
 
   def time_now
